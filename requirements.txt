@@ -60,3 +60,8 @@ matplotlib
 seaborn
 emoji
 urlextract
+streamlit
+pandas
+matplotlib
+seaborn
+emoji
