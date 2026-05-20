@@ -1,137 +1,212 @@
 import streamlit as st
-import preprocessor as pp,helper
-import matplotlib.pyplot as plt
-import seaborn as sns
+import helper
+import preprocessor as pp
+import pandas as pd
+import plotly.express as px
 
-from helper import most_common_words
+# ---------- BACKGROUND STYLE ----------
+def set_bg():
 
-st.sidebar.title('Whatsaap Chat Analysis')
+    page_bg = """
+    <style>
 
-uploaded_file = st.sidebar.file_uploader('Upload your file')
+    /* Main App Background */
+    .stApp {
+        background-image: url("https://images.unsplash.com/photo-1557683316-973673baf926");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: rgba(0,0,0,0.75);
+        backdrop-filter: blur(10px);
+    }
+
+    /* Cards / Containers */
+    .block-container {
+        background: rgba(255,255,255,0.08);
+        padding: 2rem;
+        border-radius: 15px;
+        backdrop-filter: blur(12px);
+    }
+
+    /* Text Color */
+    h1, h2, h3, h4, h5, h6, p, label {
+        color: white !important;
+    }
+
+    </style>
+    """
+
+    st.markdown(page_bg, unsafe_allow_html=True)
+
+set_bg()
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(
+    page_title="WhatsApp Chat Analyzer",
+    page_icon="💬",
+    layout="wide"
+)
+
+# ---------------- CUSTOM CSS ----------------
+st.markdown("""
+<style>
+.big-font {
+    font-size:22px !important;
+    font-weight:bold;
+}
+.metric-card {
+    background-color:#0e1117;
+    padding:20px;
+    border-radius:10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- SIDEBAR ----------------
+st.sidebar.title("💬 WhatsApp Chat Analyzer")
+uploaded_file = st.sidebar.file_uploader("Upload WhatsApp Chat")
+
+# ---------------- LOAD DATA ----------------
 if uploaded_file is not None:
+
     bytes_data = uploaded_file.getvalue()
     data = bytes_data.decode("utf-8")
     df = pp.preprocessor(data)
 
-    st.dataframe(df)
-
+    # User List
     user_list = df['user'].unique().tolist()
     user_list.remove('group_notification')
     user_list.sort()
-    user_list.insert(0,'overall')
-    st.subheader('User List')
-    selected_user = st.sidebar.selectbox(' Show analysis wrt', user_list)
+    user_list.insert(0, "overall")
 
-    if st.sidebar.button('Show Analysis'):
+    selected_user = st.sidebar.selectbox(
+        "Select User",
+        user_list
+    )
 
-        # ---------- Top Stats ----------
-        num_message, word, num_media_msg, num_links = helper.fetch_stats(selected_user, df)
+    if st.sidebar.button("🚀 Analyze Chat"):
 
-        st.title('Top Statistics of WhatsApp Chat Analysis')
+        # ================= KPI SECTION =================
+        st.title("📊 WhatsApp Chat Dashboard")
+
+        num_messages, words, media, links = helper.fetch_stats(selected_user, df)
 
         col1, col2, col3, col4 = st.columns(4)
 
-        col1.metric("Total Messages", num_message)
-        col2.metric("Total Words", word)
-        col3.metric("Media Shared", num_media_msg)
-        col4.metric("Links Shared", num_links)
+        col1.metric("Total Messages", num_messages)
+        col2.metric("Total Words", words)
+        col3.metric("Media Shared", media)
+        col4.metric("Links Shared", links)
 
-        # ---------- Busy Users ----------
-        if selected_user == 'overall':
-            st.title('Most Busy Users')
+        st.divider()
 
-            x, new_df = helper.most_busy_users(df)
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                fig, ax = plt.subplots()
-                ax.bar(x.index, x.values)
-                plt.xticks(rotation=90)
-                st.pyplot(fig)
-
-            with col2:
-                st.dataframe(new_df)
-
-        # ---------- Common Words ----------
-        st.title('Most Common Words')
-
-        most_common_df = helper.most_common_words(selected_user, df)
-
-        fig, ax = plt.subplots()
-        ax.bar(most_common_df[0], most_common_df[1])
-        plt.xticks(rotation=90)
-
-        st.pyplot(fig)
-
-        # ---------- Emoji Analysis ----------
-        st.title('Emoji Analysis')
-
-        emoji_df = helper.emoji_helper(selected_user, df)
-
-        col1, col2 = st.columns(2)
-
-        col1.dataframe(emoji_df)
-
-        with col2:
-            fig, ax = plt.subplots()
-            ax.pie(emoji_df[1], labels=emoji_df[0], autopct='%1.1f%%')
-            st.pyplot(fig)
-
-        # ---------- Monthly Timeline ----------
-        st.title("Monthly Timeline Analysis")
+        # ================= TIMELINE =================
+        st.subheader("📈 Monthly Timeline")
 
         timeline = helper.monthly_timeline(selected_user, df)
 
-        fig, ax = plt.subplots()
+        fig = px.line(
+            timeline,
+            x="time",
+            y="message",
+            markers=True,
+            title="Message Trend Over Time"
+        )
 
-        ax.plot(timeline['time'], timeline['message'])
-        plt.xticks(rotation='vertical')
-        plt.show()
+        st.plotly_chart(fig, use_container_width=True)
 
-        st.pyplot(fig)
+        # ================= DAILY ACTIVITY =================
+        st.subheader("📅 Daily Activity")
 
-        # Daily Timeline
+        daily = helper.daily_timeline(selected_user, df)
 
-        st.title('Daily Timeline Analysis')
-        daily_timeline = helper.daily_timeline(selected_user, df)
+        fig = px.line(
+            daily,
+            x="only_date",
+            y="message",
+            title="Daily Messages"
+        )
 
-        fig, ax = plt.subplots()
+        st.plotly_chart(fig, use_container_width=True)
 
-        ax.plot(daily_timeline['only_date'], daily_timeline['message'])
-        plt.xticks(rotation='vertical')
-        plt.show()
-        st.pyplot(fig)
+        # ================= BUSY USERS =================
+        if selected_user == "overall":
 
-        st.title('Activity Map')
+            st.subheader("🔥 Most Active Users")
+
+            x, new_df = helper.most_busy_users(df)
+
+            fig = px.bar(
+                x,
+                x=x.index,
+                y=x.values,
+                labels={'x': 'User', 'y': 'Messages'}
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(new_df)
+
+        # ================= WORD ANALYSIS =================
+        st.subheader("📝 Most Common Words")
+
+        common_words = helper.most_common_words(selected_user, df)
+
+        fig = px.bar(
+            common_words,
+            x=0,
+            y=1,
+            title="Top Words Used"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ================= EMOJI ANALYSIS =================
+        st.subheader("😂 Emoji Analysis")
+
+        emoji_df = helper.emoji_helper(selected_user, df)
+
+        fig = px.pie(
+            emoji_df.head(10),
+            values=1,
+            names=0,
+            title="Top Emojis"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ================= ACTIVITY MAP =================
+        st.subheader("📊 Activity Map")
+
         col1, col2 = st.columns(2)
 
         with col1:
-            st.header('Most Busy Day')
-            busy_day = helper.week_activity_map (selected_user, df)
-
-            fig, ax = plt.subplots()
-
-            ax.bar(busy_day.index, busy_day.values,color='blue')
-            plt.xticks(rotation='vertical')
-            st.pyplot(fig)
-
+            busy_day = helper.week_activity_map(selected_user, df)
+            fig = px.bar(
+                busy_day,
+                title="Most Busy Day"
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
         with col2:
-            st.header('Most Busy Month')
             busy_month = helper.month_activity_map(selected_user, df)
+            fig = px.bar(
+                busy_month,
+                title="Most Busy Month"
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-            fig, ax = plt.subplots()
+        # ================= HEATMAP =================
+        st.subheader("🕒 Online Activity Heatmap")
 
-            ax.bar(busy_month.index, busy_month.values, color='purple')
-            plt.xticks(rotation='vertical')
-            st.pyplot(fig)
+        heatmap = helper.activity_heatmap(selected_user, df)
 
+        fig = px.imshow(
+            heatmap,
+            color_continuous_scale="Blues",
+            aspect="auto"
+        )
 
-        st.title('Online Activity Map')
-        user_heatmap = helper.activity_heatmap(selected_user,df)
-        fig, ax = plt.subplots()
-        ax = sns.heatmap(user_heatmap)
-        st.pyplot(fig)
-
-
+        st.plotly_chart(fig, use_container_width=True)
