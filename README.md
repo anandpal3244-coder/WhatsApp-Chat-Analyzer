@@ -2,7 +2,7 @@
 
 <p align="center">
 🚀 AI Powered WhatsApp Chat Analytics Dashboard <br>
-Built using Python • Streamlit • Pandas • NLP
+Built using Python • Streamlit • Pandas 
 </p>
 
 <p align="center">
